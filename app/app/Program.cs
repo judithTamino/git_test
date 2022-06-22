@@ -45,21 +45,23 @@ namespace app
 
                         if (str.Length != 0)
                         {
-                            project_files.Add(str[str.Length - 1], file);
+                            project_files.Add(str[str.Length - 1], ConvertToBase64String(file));
                         }
                     }
-                        
+
 
                     var sha_file_list = await github.CreateBlob(project_files);
                     string current_commit_url = await github.GetCurrentCommit();
                     string base_tree_sha = await github.GetCurrentCommitTree(current_commit_url);
 
                     await github.CreateTree(base_tree_sha, sha_file_list);
-                } 
-                catch(IOException error) 
-                { 
+
+                    //await github.AddCommit(new_tree_sha);
+                }
+                catch (IOException error)
+                {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(error); 
+                    Console.WriteLine(error);
                 }
                 lastRead = lastWrite;
             }

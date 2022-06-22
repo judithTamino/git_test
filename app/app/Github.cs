@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using RestSharp;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,6 +10,8 @@ namespace app
     {
         private static string base_url = "https://api.github.com";
         private static string path_parameters = @"judithTamino/git_test";
+
+        private static string parent_commit_sha;
 
         public async Task<Dictionary<string, string>> CreateBlob(Dictionary<string, string> convert_files)
         {
@@ -24,7 +27,7 @@ namespace app
                 request.AddHeader("Authorization", "Bearer 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");
                 request.AddHeader("Accept", "application/vnd.github.v3+json");
 
-                string data = Newtonsoft.Json.JsonConvert.SerializeObject(new {content = file.Value});
+                string data = Newtonsoft.Json.JsonConvert.SerializeObject(new {content = file.Value, encoding = "base64"});
                 request.AddParameter("application/json", data, ParameterType.RequestBody);
 
                 RestResponse response = await client.ExecuteAsync(request);
@@ -49,11 +52,13 @@ namespace app
             RestResponse response = await client.GetAsync(request);
 
             JToken body = JObject.Parse(response.Content);
+
             string commit_url = body["object"]["url"].ToString();
+            parent_commit_sha = body["object"]["sha"].ToString();
 
             return commit_url;
         }
-
+        
         public async Task<string> GetCurrentCommitTree(string commit_url)
         {
             RestClient client = new RestClient(commit_url);
@@ -73,18 +78,18 @@ namespace app
             string endpoin = $"{base_url}/repos/{path_parameters}/git/trees";
 
             int i = 0;
-            string[] blobs_obj = new string[blobs_sha_list.Count];
+            object[] blobs_obj = new object[blobs_sha_list.Count];
 
             
 
             foreach (var sha in blobs_sha_list)
             {
-                string data = Newtonsoft.Json.JsonConvert.SerializeObject(new { 
+                var data = new { 
                     path = $"demo/demo/{sha.Key}", 
                     mode = "100644",
                     type = "blob",
                     sha = sha.Value,
-                });
+                };
 
                 blobs_obj[i] = data;
                 i++;                
@@ -103,6 +108,50 @@ namespace app
                 base_tree = base_tree_sha
             });
 
+            request.AddParameter("application/json", body, ParameterType.RequestBody);
+            RestResponse response = await client.ExecuteAsync(request);
+            string content = JObject.Parse(response.Content)["sha"].ToString();
+
+            await AddCommit(content);
+        }
+
+        public async Task AddCommit(string new_tree_sha)
+        {
+            //Console.WriteLine("Write commit message");
+            //string msg = Console.ReadLine();
+
+            string[] parents = {parent_commit_sha};
+            string endpoint = $"{base_url}/repos/{path_parameters}/git/commits";
+
+            string body = Newtonsoft.Json.JsonConvert.SerializeObject(new { tree = new_tree_sha, message = $"msg {new Guid()}", parents = parents });
+
+            RestClient client = new RestClient(endpoint);
+
+            RestRequest request = new RestRequest();
+            request.Method = Method.Post;
+            request.AddHeader("Authorization", "Bearer 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");
+            request.AddHeader("Accept", "application/vnd.github.v3+json");
+
+            request.AddParameter("application/json", body, ParameterType.RequestBody);
+            RestResponse response = await client.ExecuteAsync(request);
+
+            string commit_sha = JObject.Parse(response.Content)["sha"].ToString();
+
+            await UpdateRef(commit_sha);
+        }
+
+        public async Task UpdateRef(string new_commit_sha)
+        {
+            string endpoint = "/repos/" + path_parameters + "/git/refs/heads/main";
+
+            RestClient client = new RestClient(base_url + endpoint);
+
+            RestRequest request = new RestRequest();
+            request.Method = Method.Patch;
+            request.AddHeader("Authorization", "Bearer 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");
+            request.AddHeader("Accept", "application/vnd.github.v3+json");
+
+            string body = Newtonsoft.Json.JsonConvert.SerializeObject(new { sha = new_commit_sha});
             request.AddParameter("application/json", body, ParameterType.RequestBody);
             RestResponse response = await client.ExecuteAsync(request);
         }
