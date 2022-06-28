@@ -1,8 +1,0 @@
-C:\Users\user\Desktop\git_test\demo\demo\bin\Debug\demo.exe.config
-C:\Users\user\Desktop\git_test\demo\demo\bin\Debug\demo.exe
-C:\Users\user\Desktop\git_test\demo\demo\bin\Debug\demo.pdb
-C:\Users\user\Desktop\git_test\demo\demo\obj\Debug\demo.csproj.AssemblyReference.cache
-C:\Users\user\Desktop\git_test\demo\demo\obj\Debug\demo.csproj.SuggestedBindingRedirects.cache
-C:\Users\user\Desktop\git_test\demo\demo\obj\Debug\demo.csproj.CoreCompileInputs.cache
-C:\Users\user\Desktop\git_test\demo\demo\obj\Debug\demo.exe
-C:\Users\user\Desktop\git_test\demo\demo\obj\Debug\demo.pdb
