@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -23,7 +22,7 @@ namespace app
             RestRequest request = new RestRequest();
 
             request.Method = Method.Post;
-            request.AddHeader("Authorization", "Bearer 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");
+            request.AddHeader("Authorization", "Bearer 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");
             request.AddHeader("Accept", "application/vnd.github.v3+json");
             request.AddParameter("application/json", payload, ParameterType.RequestBody);
 
@@ -35,7 +34,7 @@ namespace app
             RestRequest request = new RestRequest();
 
             request.Method = Method.Get;
-            request.AddHeader("Authorization", "Bearer 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");
+            request.AddHeader("Authorization", "Bearer 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");
             request.AddHeader("Accept", "application/vnd.github.v3+json");
 
             return request;
@@ -46,7 +45,7 @@ namespace app
             RestRequest request = new RestRequest();
 
             request.Method = Method.Patch;
-            request.AddHeader("Authorization", "Bearer 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");
+            request.AddHeader("Authorization", "Bearer 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");
             request.AddHeader("Accept", "application/vnd.github.v3+json");
             request.AddParameter("application/json", payload, ParameterType.RequestBody);
 
@@ -62,8 +61,9 @@ namespace app
         public JToken GetContent (RestResponse response)
         {
             var content = response.Content;
+            if (content[0].Equals('['))
+                return JArray.Parse(content);
             return JObject.Parse(content);
         }
-
     }
 }

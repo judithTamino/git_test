@@ -2,25 +2,29 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
+using System.Xml;
 
 namespace app
 {
     internal class Program
     {
         private static Github github = new Github();
-        private static ReadTestResult test = new ReadTestResult();
 
         private static DateTime lastRead = DateTime.MinValue;
-
         private static string path = @"C:\Users\user\Desktop\Demo_Project";
         private static string repo = "Demo_Project";
 
+        private static int countPushEvents = 0;
+        private static string commit = "";
+        private static bool uploadToGithub = false;
         static void Main(string[] args)
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("WELCOME TO MY LITTLE CI");
             Console.ResetColor();
 
+            CheckChangesToRepository();
             Watcher(path);
         }
 
@@ -47,8 +51,8 @@ namespace app
             Console.ReadLine();
         }
 
-        
-        private async static void Changed(object sender, FileSystemEventArgs e)
+
+        private static void Changed(object sender, FileSystemEventArgs e)
         {
             DateTime lastWrite = File.GetLastWriteTime(path);
 
@@ -57,7 +61,15 @@ namespace app
                 RunBuild();
                 RunTest();
 
-                UploadToGithub(e.FullPath);
+                int failedTest = GetFailedTest();
+                if (failedTest == 0)
+                    UploadToGithub(e.FullPath);
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"There are {failedTest} failed test, couldnt upload file to github");
+                    Console.ResetColor();
+                }
                 lastRead = lastWrite;
             }
         }
@@ -67,7 +79,7 @@ namespace app
             string exeMSBulidPath = @"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe";
             string solutionPath = @"C:\Users\user\Desktop\Demo_Project\DemoProject\DemoProject.sln";
 
-            if(!RunProcess(exeMSBulidPath, solutionPath))
+            if (!RunProcess(exeMSBulidPath, solutionPath))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("\nBuild Unsuccessfully");
@@ -97,14 +109,14 @@ namespace app
             startInfo.FileName = filename;
             startInfo.Arguments = arguments;
 
-            using(Process p = Process.Start(startInfo))
+            using (Process p = Process.Start(startInfo))
             {
                 p.WaitForExit();
                 return (p.ExitCode == 0);
             }
         }
 
-        private static async void UploadToGithub(string file)
+        private async static void UploadToGithub(string file)
         {
             Dictionary<string, string> encodedFiles = new Dictionary<string, string>();
 
@@ -120,8 +132,7 @@ namespace app
             string current_base_tree_sha = await github.GetBaseTree(current_commit_sha);
             string new_tree_sha = await github.CreateTree(current_base_tree_sha, blobFiles);
             string new_commit_sha = await github.AddCommit(new_tree_sha, current_commit_sha);
-
-            github.UpdateRef(new_commit_sha);
+            uploadToGithub = await github.UpdateRef(new_commit_sha);
         }
 
         private static string ConstructGithubPath(string[] repoUrl)
@@ -140,6 +151,45 @@ namespace app
         {
             byte[] bytes = File.ReadAllBytes(file_path);
             return Convert.ToBase64String(bytes);
+        }
+
+        private static int GetFailedTest()
+        {
+            XmlDocument xml = new XmlDocument();
+            xml.Load(@"C:\Users\user\Desktop\git_test\app\app\bin\Debug\TestResult.xml");
+
+            XmlElement root_element = xml.DocumentElement;
+            int failedTest = Convert.ToInt32(root_element.GetAttribute("failed"));
+
+            return failedTest;
+        }
+
+        public static void CheckChangesToRepository()
+        {
+            Task.Factory.StartNew(async () =>
+            {
+                while (true)
+                {
+                    string latestCommit = await github.CheckRepoChanges();
+                    Console.WriteLine("COMMITS");
+
+                    if (!latestCommit.Equals(""))
+                    {
+                        if (commit.Equals("") && !uploadToGithub)
+                            commit = latestCommit;
+
+                        else if(!commit.Equals(latestCommit) || uploadToGithub)
+                        {
+                            string[] tag = await github.CreateTagObject();
+                            github.AppendTag(tag);
+                        }
+
+                        uploadToGithub = false;
+                    }
+
+                    System.Threading.Thread.Sleep(30000);
+                }
+            });
         }
     }
 }

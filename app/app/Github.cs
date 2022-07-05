@@ -72,7 +72,7 @@ namespace app
 
             if (content.HasValues)
                 return content["sha"].ToString();
-            
+
             return "";
         }
 
@@ -91,7 +91,7 @@ namespace app
             return "";
         }
 
-        public async void UpdateRef(string newCommitSHA)
+        public async Task<bool> UpdateRef(string newCommitSHA)
         {
             string endpoint = @"git/refs/heads/main";
             string payload = JsonConvert.SerializeObject(new { sha = newCommitSHA });
@@ -103,10 +103,106 @@ namespace app
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("The files were uploaded successfully");
                 Console.ResetColor();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public async Task<string> CheckRepoChanges()
+        {
+            string firstCommit = "";
+            string endpoint = @"commits";
+            JToken content = await GetRequeset(endpoint);
+
+
+            if (content.HasValues)
+                firstCommit = content[0]["sha"].ToString();
+
+            return firstCommit;
+        } 
+
+        public async Task<int> GetCommits()
+        {
+            int countCommits = 0;
+            string endpoint = @"commits";
+            JToken content = await GetRequeset(endpoint);
+
+            foreach (var commit in content)
+                countCommits++;
+
+            return countCommits;
+        }
+
+        public async Task<string[]> CreateTagObject()
+        {
+            Guid guid = Guid.NewGuid();
+            string[] tagData = new string[2];
+
+            // get current commit
+            string currentCommit = await GetCurrentCommit();
+            string endpoint = @"git/tags";
+
+            // create tag
+            JObject container = new JObject();
+            JProperty tag = new JProperty("tag", "V." + guid);
+            JProperty message = new JProperty("message", "initial version");
+            JProperty obj = new JProperty("object", currentCommit);
+            JProperty type = new JProperty("type", "commit");
+
+            container.Add(tag);
+            container.Add(message);
+            container.Add(obj);
+            container.Add(type);
+
+            string payload = container.ToString();
+            JToken content = await PostRequeset(endpoint, payload);
+
+            if (content.HasValues)
+            {
+                tagData[0] = content["sha"].ToString();
+                tagData[1] = content["tag"].ToString();
+            }
+            return tagData;
+        }
+
+        public async void AppendTag(string[] tag)
+        {
+            string endpoint = @"git/refs";
+
+            JObject payload = new JObject();
+
+            JProperty reference = new JProperty("ref", $"refs/tags/{tag[1]}");
+            JProperty sha = new JProperty("sha", tag[0]);
+
+            payload.Add(reference);
+            payload.Add(sha);
+
+            JToken content = await PostRequeset(endpoint, payload.ToString());
+
+            if (content.HasValues)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("Tag created succssefully");
+                Console.ResetColor();
             }
         }
 
-     
+        /*public async void CreatePullRequest()
+        {
+            string endpoint = @"pulls";
+            string payload = @"{
+                                    " + "\n" +
+                                    @"   ""head"": ""main"", 
+                                    " + "\n" +
+                                    @"   ""base"": ""main"",
+                                    " + "\n" +
+                                    @"   ""title"": ""My Test Pull Request""
+                                    " + "\n" +
+                                    @"}";
+            JToken content = await PostRequeset(endpoint, payload);
+        }*/
 
         private async Task<JToken> PostRequeset(string endpoint, string payload)
         {
